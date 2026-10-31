@@ -1,0 +1,20 @@
+# Keil 编译产物 (projects/*/keil5 下)
+# 注意: 不要用全局 *.o / *.bin, 以下文件是需要保留的:
+#   mode_24g/rf_protocol.o                  2.4G 协议库, 只有 .o, 工程直接链接
+#   components/exble2/stack/exble2.lib      蓝牙协议栈库
+#   SE73_BootLoader_*.bin                   BootLoader
+projects/*/keil5/out/
+projects/*/keil5/_build/
+projects/*/keil5/*.bin
+projects/*/keil5/*.hex
+projects/*/keil5/_dis.txt
+
+# Keil 个人界面/调试配置 (每台电脑不同)
+*.uvguix.*
+*.uvoptx.bak
+*.uvprojx.bak
+projects/*/keil5/JLinkLog.txt
+
+# VS Code Keil Assistant 日志
+*.log
+*.log.lock
