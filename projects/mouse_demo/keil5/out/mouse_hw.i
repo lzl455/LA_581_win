@@ -4435,6 +4435,13 @@ char bt_kb_name[29U];
 
 uint8_t ble_interval;
 
+
+
+
+
+static uint32_t ble_logo_time;
+static uint32_t ble_hint_time;
+
 extern _Bool bperiph_int;
 extern uint32_t adv_interval_ms;
 
@@ -4508,17 +4515,33 @@ __attribute((used, section("RAM_CODE"), noinline)) uint8_t ex2_app_mouse_scan(vo
 
     if(MS_SLEEP_LEVEL0 == ms_sleep_level)
     {
+        uint32_t rtc_now;
+        uint8_t i;
+
         matrixkey_scan();
         wheel_scan();
-        logo_process();
+
+
+
+        rtc_now = drv_rtc_read(((OM_RTC_Type *) 0x40000200));
+        if(((8*4)<<5) < (rtc_now-ble_logo_time))
+            ble_logo_time = rtc_now - ((8)<<5);
+        for(i=0; (i<4) && (((8)<<5) <= (rtc_now-ble_logo_time)); i++)
+        {
+            ble_logo_time += ((8)<<5);
+            logo_process();
+        }
 
         drv_ledc_write();
 
-        lvd_scan_count++;
-        if(0==(lvd_scan_count&0x01))
+        if(((16*2)<<5) < (rtc_now-ble_hint_time))
+            ble_hint_time = rtc_now - ((16)<<5);
+        for(i=0; (i<2) && (((16)<<5) <= (rtc_now-ble_hint_time)); i++)
+        {
+            ble_hint_time += ((16)<<5);
             device_led_process();
-        else
             led_hint_process();
+        }
     }
     else
     {

@@ -76,6 +76,13 @@ char                        bt_kb_name[MOUSE_NAME_MAX_LEN];
 
 uint8_t                     ble_interval;
 
+#define iBLE_LOGO_STEP_MS           8           // 与USB main_usb一致: 灯效8ms一帧
+#define iBLE_HINT_STEP_MS           16          // 与USB main_usb一致: 指示灯/提示16ms一步
+#define iBLE_LOGO_CATCH_UP_MAX      4           // 单次最多补4帧(32ms), 覆盖常见最大连接间隔30ms
+#define iBLE_HINT_CATCH_UP_MAX      2
+static uint32_t             ble_logo_time;
+static uint32_t             ble_hint_time;
+
 extern bool                 bperiph_int;
 extern uint32_t             adv_interval_ms;
 
@@ -149,17 +156,33 @@ __RAM_CODE uint8_t ex2_app_mouse_scan(void)
 
     if(MS_SLEEP_LEVEL0 == ms_sleep_level)
     {
+        uint32_t rtc_now;
+        uint8_t  i;
+
         matrixkey_scan();
         wheel_scan();
-        logo_process();
 
-        drv_ledc_write();                       // ARGB每个周期调用一次写数据处理
+        // 灯效/提示按RTC时间节拍运行, 与USB模式一致(灯效8ms一帧, 提示16ms一步);
+        // 原来每个连接间隔跑一次, 速度随主机分配的间隔(7.5ms~30ms)变化
+        rtc_now = drv_rtc_read(OM_RTC);
+        if(mMS_TO_TICK(iBLE_LOGO_STEP_MS*iBLE_LOGO_CATCH_UP_MAX) < (rtc_now-ble_logo_time))
+            ble_logo_time = rtc_now - mMS_TO_TICK(iBLE_LOGO_STEP_MS);  // 落后太多(刚唤醒/刚连上)直接对齐, 只跑一帧不追帧
+        for(i=0; (i<iBLE_LOGO_CATCH_UP_MAX) && (mMS_TO_TICK(iBLE_LOGO_STEP_MS) <= (rtc_now-ble_logo_time)); i++)
+        {
+            ble_logo_time += mMS_TO_TICK(iBLE_LOGO_STEP_MS);
+            logo_process();                     // 间隔大于8ms时一次补跑多帧, 动画速度不变
+        }
 
-        lvd_scan_count++;
-        if(0==(lvd_scan_count&0x01))
-            device_led_process();               // 15ms
-        else
+        drv_ledc_write();                       // 一帧算完再写
+
+        if(mMS_TO_TICK(iBLE_HINT_STEP_MS*iBLE_HINT_CATCH_UP_MAX) < (rtc_now-ble_hint_time))
+            ble_hint_time = rtc_now - mMS_TO_TICK(iBLE_HINT_STEP_MS);
+        for(i=0; (i<iBLE_HINT_CATCH_UP_MAX) && (mMS_TO_TICK(iBLE_HINT_STEP_MS) <= (rtc_now-ble_hint_time)); i++)
+        {
+            ble_hint_time += mMS_TO_TICK(iBLE_HINT_STEP_MS);
+            device_led_process();
             led_hint_process();
+        }
     }
     else
     {
